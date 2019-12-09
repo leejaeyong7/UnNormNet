@@ -9,6 +9,8 @@ from __future__ import print_function
 
 import os
 import sys
+sys.path.append('.')
+
 import time
 import torch
 import torch.backends.cudnn as cudnn
@@ -18,15 +20,14 @@ import socket
 import tensorboard_logger as tb_logger
 
 from torchvision import transforms, datasets
-from util import adjust_learning_rate, AverageMeter
-
+from utils.util import adjust_learning_rate, AverageMeter
 from models.resnet import InsResNet50
 from NCE.NCEAverage import MemoryInsDis
 from NCE.NCEAverage import MemoryMoCo
 from NCE.NCECriterion import NCECriterion
 from NCE.NCECriterion import NCESoftmaxLoss
 
-from dataset import ImageFolderInstance
+from dataset.cmc_imgnet_dataset import ImageFolderInstance
 
 try:
     from apex import amp, optimizers
@@ -80,6 +81,11 @@ def parse_option():
     # model definition
     parser.add_argument('--model', type=str, default='resnet50', choices=['resnet50', 'resnet50x2', 'resnet50x4'])
 
+    # specify folder
+    parser.add_argument('--data_folder', type=str, default='./data', help='path to data')
+    parser.add_argument('--model_path', type=str, default=None, help='path to save model')
+    parser.add_argument('--tb_path', type=str, default=None, help='path to tensorboard')
+
     # loss function
     parser.add_argument('--softmax', action='store_true', help='using softmax contrastive loss rather than NCE')
     parser.add_argument('--nce_k', type=int, default=16384)
@@ -94,14 +100,6 @@ def parse_option():
     parser.add_argument('--gpu', default=None, type=int, help='GPU id to use.')
 
     opt = parser.parse_args()
-
-    # set the path according to the environment
-    if hostname.startswith('visiongpu'):
-        opt.data_folder = '/dev/shm/yonglong/{}'.format(opt.dataset)
-        opt.model_path = '/data/vision/phillipi/rep-learn/Pedesis/CMC/{}_models'.format(opt.dataset)
-        opt.tb_path = '/data/vision/phillipi/rep-learn/Pedesis/CMC/{}_tensorboard'.format(opt.dataset)
-    else:
-        raise NotImplementedError('server invalid: {}'.format(hostname))
 
     if opt.dataset == 'imagenet':
         if 'alexnet' not in opt.model:
@@ -160,7 +158,7 @@ def main():
         print("Use GPU: {} for training".format(args.gpu))
 
     # set the data loader
-    data_folder = os.path.join(args.data_folder, 'train')
+    data_folder = os.path.join(args.data_folder, args.dataset, 'train')
 
     image_size = 224
     mean = [0.485, 0.456, 0.406]
@@ -188,6 +186,7 @@ def main():
 
     train_dataset = ImageFolderInstance(data_folder, transform=train_transform, two_crop=args.moco)
     print(len(train_dataset))
+
     train_sampler = None
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
@@ -391,7 +390,7 @@ def train_ins(epoch, train_loader, model, contrast, criterion, optimizer, opt):
                   'prob {prob.val:.3f} ({prob.avg:.3f})'.format(
                    epoch, idx + 1, len(train_loader), batch_time=batch_time,
                    data_time=data_time, loss=loss_meter, prob=prob_meter))
-            print(out.shape)
+            # print(out.shape)
             sys.stdout.flush()
 
     return loss_meter.avg, prob_meter.avg
@@ -474,7 +473,7 @@ def train_moco(epoch, train_loader, model, model_ema, contrast, criterion, optim
                   'prob {prob.val:.3f} ({prob.avg:.3f})'.format(
                    epoch, idx + 1, len(train_loader), batch_time=batch_time,
                    data_time=data_time, loss=loss_meter, prob=prob_meter))
-            print(out.shape)
+            # print(out.shape)
             sys.stdout.flush()
 
     return loss_meter.avg, prob_meter.avg

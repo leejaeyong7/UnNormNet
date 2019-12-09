@@ -1,0 +1,43 @@
+image-width: 224
+image-height: 224
+num-augmentations: 1
+color-perturb:
+    probability: 0.5
+    distribution:
+        type: truncated-normal
+        mean: 0
+        std: 7
+        start: -20
+        end: 20
+jpeg-compression:
+    probability: 0
+    distribution: 
+        type: truncated-normal
+        mean: 0
+        std: 0
+        start: 0
+        end: 0
+grayscale:
+    probability: 0.2
+    distribution: 
+        type: uniform
+        start: 0
+        end: 0
+motion-blur:
+    probability: 0.3
+    distribution: 
+        type: uniform
+        start: 3
+        end: 3
+gaussian-blur:
+    probability: 0.1
+    distribution: 
+        type: uniform
+        start: 1
+        end: 1
+gaussian-noise:
+    probability: 0.1
+    distribution: 
+        type: uniform
+        start: 0
+        end: 3

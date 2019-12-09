@@ -10,7 +10,6 @@ tmp*.py
 # run*.sh
 *.pdf
 
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

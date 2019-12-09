@@ -1,10 +1,10 @@
-"""
-Train CMC with AlexNet
-"""
+"""Train CMC with AlexNet"""
 from __future__ import print_function
 
 import os
 import sys
+sys.path.append('.')
+
 import time
 import torch
 import torch.backends.cudnn as cudnn
@@ -12,18 +12,16 @@ import argparse
 import socket
 
 import tensorboard_logger as tb_logger
-
 from torchvision import transforms, datasets
-from dataset import RGB2Lab, RGB2YCbCr
-from util import adjust_learning_rate, AverageMeter
 
+from utils.util import adjust_learning_rate, AverageMeter
 from models.alexnet import MyAlexNetCMC
 from models.resnet import MyResNetsCMC
 from NCE.NCEAverage import NCEAverage
 from NCE.NCECriterion import NCECriterion
 from NCE.NCECriterion import NCESoftmaxLoss
-
-from dataset import ImageFolderInstance
+from dataset.cmc_imgnet_dataset import RGB2Lab, RGB2YCbCr
+from dataset.cmc_imgnet_dataset import ImageFolderInstance
 
 try:
     from apex import amp, optimizers
@@ -33,9 +31,7 @@ except ImportError:
 TODO: python 3.6 ModuleNotFoundError
 """
 
-
 def parse_option():
-
     parser = argparse.ArgumentParser('argument for training')
 
     parser.add_argument('--print_freq', type=int, default=10, help='print frequency')
@@ -216,7 +212,7 @@ def train(epoch, train_loader, model, contrast, criterion_l, criterion_ab, optim
         bsz = inputs.size(0)
         inputs = inputs.float()
         if torch.cuda.is_available():
-            index = index.cuda(async=True)
+            index = index.cuda(non_blocking=True)
             inputs = inputs.cuda()
 
         # ===================forward=====================
@@ -261,7 +257,7 @@ def train(epoch, train_loader, model, contrast, criterion_l, criterion_ab, optim
                    epoch, idx + 1, len(train_loader), batch_time=batch_time,
                    data_time=data_time, loss=losses, lprobs=l_prob_meter,
                    abprobs=ab_prob_meter))
-            print(out_l.shape)
+            # print(out_l.shape)
             sys.stdout.flush()
 
     return l_loss_meter.avg, l_prob_meter.avg, ab_loss_meter.avg, ab_prob_meter.avg

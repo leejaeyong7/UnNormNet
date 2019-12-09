@@ -1,45 +1,87 @@
-Unofficial implementation:
-- MoCo: Momentum Contrast for Unsupervised Visual Representation Learning ([Paper](https://arxiv.org/abs/1911.05722)) 
-- InsDis: Unsupervised Feature Learning via Non-Parametric Instance-level Discrimination ([Paper](https://arxiv.org/abs/1805.01978))
+## Visual Representation Learning via Unsupervised Learning of Surface Normal
+This repo covers the implementation for ECE 598 final project. This project aims to learn visual representations in a self-supervised manner through unsupervised learning of surface noraml.
 
-Official implementation:
-- CMC: Contrastive Multiview Coding ([Paper](http://arxiv.org/abs/1906.05849))
+Large part of this code is from [Contrastive Multiview Coding (CMC)](https://github.com/HobbitLong/CMC/).
 
-## Contrastive Multiview Coding
-
-This repo covers the implementation for CMC (as well as Momentum Contrast and Instance Discrimination), which learns representations from multiview data in a self-supervised way (by multiview, we mean multiple sensory, multiple modal data, or literally multiple viewpoint data. It's flexible to define what is a "view"):
-
-"Contrastive Multiview Coding" [Paper](http://arxiv.org/abs/1906.05849), [Project Page](http://hobbitlong.github.io/CMC/).
-
-![Teaser Image](http://hobbitlong.github.io/CMC/CMC_files/teaser.jpg)
-
-## Highlights
-
-**(1) Representation quality as a function of number of contrasted views.** 
-
-We found that, the more views we train with, the better the representation (of each single view).
-
-**(2) Contrastive objective v.s. Predictive objective**
-
-We compare the contrastive objective to cross-view prediction, finding an advantage to the contrastive approach.
-
-**(3) Unsupervised v.s. Supervised**
-
-Several ResNets trained with our **unsupervised** CMC objective surpasses **supervisedly** trained AlexNet on ImageNet classification ( e.g., 68.4% v.s. 59.3%). For this first time on ImageNet classification, unsupervised methods are surpassing the classic supervised-AlexNet proposed in 2012 (CPC++ and AMDIM also achieve this milestone concurrently). 
-
-## Updates
-
-Aug 20, 2019 - ResNets on ImageNet have been added.
-
-Nov 26, 2019 - New results updated. Implementation of **MoCo** and **InsDis** added:
 
 ## Installation
+This repo was tested with Python 3.7, PyTorch 0.4.1, and CUDA 10.0.  To install: 
 
-This repo was tested with Ubuntu 16.04.5 LTS, Python 3.5, PyTorch 0.4.0, and CUDA 9.0. But it should be runnable with recent PyTorch versions >=0.4.0
+```bash
+conda create --name unnorm -y
+conda activate unnorm
+conda install pip opencv matplotlib numpy pyyaml
+conda install pytorch=0.4.1 cuda100 torchvision -c pytorch
+pip install imgaug tensorboard_logger
+
+# install apex
+cd $INSTALL_DIR
+git clone https://github.com/NVIDIA/apex.git
+cd apex
+python setup.py install --cuda_ext --cpp_ext
+```
 
 **Note:** It seems to us that training with Pytorch version >= 1.0 yields slightly worse results. If you find the similar discrepancy and figure out the problem, please report this since we are trying to fix it as well.
 
-## Training AlexNet/ResNets with CMC on ImageNet
+
+## Dataset
+We assume that your symlinked `data/imagenet` directory has the following structure:
+```
+|_ train
+|  |_ n01440764/
+|  |_ ...
+|  |_ n15075141/
+|_ val
+|  |_ n02095314/
+|  |_ ...
+|  |_ n04120489/
+```
+**How-to:** check `dataset/imagenet_cmd.sh` for the script to creat above structure from raw downloaded files.
+
+## Baselines
+- [Unofficial] MoCo: Momentum Contrast for Unsupervised Visual Representation Learning ([Paper](https://arxiv.org/abs/1911.05722)) 
+- [Unofficial] InsDis: Unsupervised Feature Learning via Non-Parametric Instance-level Discrimination ([Paper](https://arxiv.org/abs/1805.01978))
+- [Official] CMC: Contrastive Multiview Coding ([Paper](http://arxiv.org/abs/1906.05849))
+
+## Training on ImageNet100 subset
+
+We compare to `InsDis`, `MoCo`, and `CMC` on a `ImageNet100` subset (but the code allows one to train on full ImageNet simply by setting the flag `--dataset imagenet`):
+
+The pre-training stage:
+
+- For InsDis:
+    ```
+    CUDA_VISIBLE_DEVICES=0,1,2,3 python train_moco_ins.py \
+     --batch_size 128 --num_workers 24 --nce_k 16384 --softmax
+    ```
+- For MoCo:
+    ```
+    CUDA_VISIBLE_DEVICES=0,1,2,3 python train_moco_ins.py \
+     --batch_size 128 --num_workers 24 --nce_k 16384 --softmax --moco
+    ```
+  
+The linear evaluation stage:
+- For both InsDis and MoCo (lr=10 is better than 30 on this subset, for full imagenet please switch to 30):
+    ```
+    CUDA_VISIBLE_DEVICES=0 python eval_moco_ins.py --model resnet50 \
+     --model_path /path/to/model --num_workers 24 --learning_rate 10
+    ```
+  
+The comparison of `InsDIS`, `MoCo`, `CMC (using YCbCr)`, and `UnNorm (ours)` and on `ImageNet100` subset, is tabulated as below:
+
+|          |Arch | #Params(M) | Loss  | #Negative  | Accuracy |
+|----------|:----:|:---:|:---:|:---:|:---:|
+|  InsDis | ResNet50 | 24 | NCE  | 16384  |  53.5  |
+|  InsDis | ResNet50 | 24 | Softmax-CE  | 16384  |  69.1  |
+|  MoCo   | ResNet50 | 24 | NCE  | 16384  |  11.6  |
+|  MoCo   | ResNet50 | 24 | Softmax-CE  | 16384  |  73.4  |
+|  CMC    | 2xResNet50half | 12 | NCE  | 4096  |  74.5  |
+|  CMC    | 2xResNet50half | 12 | Softmax-CE  | 4096  |  75.8  |
+|  UnNorm | ResNet50 | 24 | - | -  | TODO |
+|  UnNorm | 2xResNet50half | 12 | - | - | TODO |
+
+
+## Training on Full ImageNet
 
 **Note:** For AlexNet, we split across the channel dimension and use each half to encode L and ab. For ResNets, we use a standard ResNet model to encode each view.
 
@@ -102,62 +144,8 @@ CUDA_VISIBLE_DEVICES=0 python LinearProbing.py --dataset imagenet \
 **Note:** When training linear classifiers on top of ResNets, it's important to use large learning rate, e.g., 30~50. Specifically, change `--learning_rate 0.1 --layer 5` to `--learning_rate 30 --layer 6` for `resnet50v1` and `resnet50v2`, to `--learning_rate 50 --layer 6` for `resnet50v3`.
 
 ## Pretrained Models
-Pretrained weights can be found in [Dropbox](https://www.dropbox.com/sh/5k4t77mt4011gyr/AABkBvKm2bGNNut0m6bLMK84a?dl=0).
-
-Note: 
-- these weights are trained with `NCE` loss, `Lab` color space, `4096` negatives and `amp` option. Changing to `softmax-ce` loss, `YCbCr`, `65536` negatives, and turning off `amp` option, are likely to further improve the results.
-- `resnet50v2.pth` and `resnet50v3.pth` are trained with FastAutoAugment, which improves the downstream accuracy by 0.8~1%. I have removed this augmentation strategy in the code but need to retrain the networks. I will update the weights once they are available.
-
-## Momentum Contrast and Instance Discrimination
-
-I have implemented and tested MoCo and InsDis on a ImageNet100 subset (but the code allows one to train on full ImageNet simply by setting the flag `--dataset imagenet`):
-
-The pre-training stage:
-
-- For InsDis:
-    ```
-    CUDA_VISIBLE_DEVICES=0,1,2,3 python train_moco_ins.py \
-     --batch_size 128 --num_workers 24 --nce_k 16384 --softmax
-    ```
-- For MoCo:
-    ```
-    CUDA_VISIBLE_DEVICES=0,1,2,3 python train_moco_ins.py \
-     --batch_size 128 --num_workers 24 --nce_k 16384 --softmax --moco
-    ```
-  
-The linear evaluation stage:
-- For both InsDis and MoCo (lr=10 is better than 30 on this subset, for full imagenet please switch to 30):
-    ```
-    CUDA_VISIBLE_DEVICES=0 python eval_moco_ins.py --model resnet50 \
-     --model_path /path/to/model --num_workers 24 --learning_rate 10
-    ```
-  
-The comparison of `CMC` (using YCbCr), `MoCo` and `InsDIS` on my ImageNet100 subset, is tabulated as below:
-
-|          |Arch | #Params(M) | Loss  | #Negative  | Accuracy |
-|----------|:----:|:---:|:---:|:---:|:---:|
-|  InsDis | ResNet50 | 24  | NCE  | 16384  |  53.5  |
-|  InsDis | ResNet50 | 24  | Softmax-CE  | 16384  |  69.1  |
-|  MoCo | ResNet50 | 24  | NCE  | 16384  |  11.6  |
-|  MoCo | ResNet50 | 24  | Softmax-CE  | 16384  |  73.4  |
-|  CMC | 2xResNet50half | 12  | NCE  | 4096  |  74.5  |
-|  CMC | 2xResNet50half | 12  | Softmax-CE  | 4096  |  75.8  |
+Pretrained weights can be found in [(TODO)](?).
 
 
-## Citation
-
-If you find this repo useful for your research, please consider citing the paper
-
-```
-@article{tian2019contrastive,
-  title={Contrastive Multiview Coding},
-  author={Tian, Yonglong and Krishnan, Dilip and Isola, Phillip},
-  journal={arXiv preprint arXiv:1906.05849},
-  year={2019}
-}
-```
-For any questions, please contact Yonglong Tian (yonglong@mit.edu).
-
-## Acknowledgements
-
-Part of this code is inspired by Zhirong Wu's unsupervised learning algorithm [lemniscate](https://github.com/zhirongw/lemniscate.pytorch).
+## Contact
+For any questions, please contact Jason Ren (zr5@illinois.edu).

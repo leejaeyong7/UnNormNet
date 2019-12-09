@@ -9,6 +9,8 @@ from __future__ import print_function
 
 import os
 import sys
+sys.path.append('.')
+
 import time
 import torch
 import torch.optim as optim
@@ -22,7 +24,7 @@ import torch.distributed as dist
 import tensorboard_logger as tb_logger
 
 from torchvision import transforms, datasets
-from util import adjust_learning_rate, AverageMeter
+from utils.util import adjust_learning_rate, AverageMeter
 
 from models.resnet import InsResNet50
 from models.LinearModel import LinearClassifierResNet

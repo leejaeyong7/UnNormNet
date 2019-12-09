@@ -2,6 +2,8 @@ from __future__ import print_function
 
 import os
 import sys
+sys.path.append('.')
+
 import time
 import torch
 import torch.optim as optim
@@ -14,14 +16,14 @@ from torch.utils.data import distributed
 import tensorboard_logger as tb_logger
 
 from torchvision import transforms, datasets
-from dataset import RGB2Lab, RGB2YCbCr
-from util import adjust_learning_rate, AverageMeter, accuracy
+from dataset.cmc_imgnet_dataset import RGB2Lab, RGB2YCbCr
+from utils.util import adjust_learning_rate, AverageMeter, accuracy
 
 from models.alexnet import MyAlexNetCMC
 from models.resnet import MyResNetsCMC
 from models.LinearModel import LinearClassifierAlexNet, LinearClassifierResNet
 
-from spawn import spawn
+from utils.spawn import spawn
 
 
 def parse_option():
@@ -32,7 +34,7 @@ def parse_option():
     parser.add_argument('--tb_freq', type=int, default=500, help='tb frequency')
     parser.add_argument('--save_freq', type=int, default=5, help='save frequency')
     parser.add_argument('--batch_size', type=int, default=256, help='batch_size')
-    parser.add_argument('--num_workers', type=int, default=32, help='num of workers to use')
+    parser.add_argument('--num_workers', type=int, default=8, help='num of workers to use')
     parser.add_argument('--epochs', type=int, default=60, help='number of training epochs')
 
     # optimization

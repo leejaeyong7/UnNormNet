@@ -8,8 +8,7 @@ import torchvision.datasets as datasets
 
 
 class ImageFolderInstance(datasets.ImageFolder):
-    """Folder datasets which returns the index of the image as well
-    """
+    """Folder datasets which returns the index of the image as well."""
 
     def __init__(self, root, transform=None, target_transform=None, two_crop=False):
         super(ImageFolderInstance, self).__init__(root, transform, target_transform)
