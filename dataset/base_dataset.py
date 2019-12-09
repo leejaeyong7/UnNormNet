@@ -67,10 +67,11 @@ class BaseDataset(Dataset):
             augmentations.append(iaa.Sometimes(aug_prob, aug_func(aug_arg)))
         self.augment_image = iaa.Sequential(augmentations, True)
         self.resize_image = iaa.Resize({'height': target_height, 'width': target_width})
-        self.resize_crop_image = iaa.Sequential([
-            iaa.Crop(percent=(0, 0.2)),
-            self.resize_image
-        ])
+        self.resize_crop_image = iaa.CropToFixedSize(height=target_height, width= target_width)
+        # self.resize_crop_image = iaa.Sequential([
+        #     iaa.Crop(percent=(0, 0.2)),
+        #     self.resize_image
+        # ])
         self.target_width = target_width
         self.target_height = target_height
 

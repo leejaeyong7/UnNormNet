@@ -24,12 +24,13 @@ from tensorboardX import SummaryWriter
 import json
 from tqdm import tqdm
 import numpy as np
+import yaml
 
 # local imports
 from dataset import COCODataset
-from model.resnet50 import ResNet50
+from models.resnet50 import ED
 from utils.checkpoint import CheckPoint
-from utils.loss import loss_fun
+from utils.loss import surface_normal_loss
 
 
 logging.basicConfig(level='INFO',
@@ -41,10 +42,16 @@ def main(args):
     writer = SummaryWriter(log_dir='./logs/{}'.format(args.run_name))
     dev = 'cpu' if args.gpu is None else 'cuda:{}'.format(args.gpu)
     device = torch.device(dev)
-    target_size = (args.target_height, args.target_width)
+
+    with open(args.config_file, 'r') as f:
+        try:
+            config = yaml.safe_load(f)
+        except yaml.YAMLError as exc:
+            logging.error("Invalid YAML")
+            logging.error(exc)
 
     # setup models
-    model = ResNet50()
+    model = ED()
     model = model.to(device)
 
     # setup training optimizers
@@ -57,8 +64,8 @@ def main(args):
     dataset_dir = args.dataset_dir
     if(args.dataset_type == 0):
         coco_dataset_dir = path.join(dataset_dir, 'coco')
-        train_dataset = COCODataset(coco_dataset_dir, mode='train')
-        val_dataset = COCODataset(coco_dataset_dir, mode='validation')
+        train_dataset = COCODataset(coco_dataset_dir, config, mode='train')
+        val_dataset = COCODataset(coco_dataset_dir, config, mode='validation')
     else:
         raise NotImplementedError
 
@@ -92,14 +99,15 @@ def main(args):
         random.shuffle(sample_indices)
         sample_it = tqdm(sample_indices, leave=False)
         for data_index in sample_it:
-            data = dataset[data_index]
-            images, corrs = data
+            data = train_dataset[data_index]
+            images, corrs, angles = data
             images = images.to(device)
             corrs = corrs.to(device)
+            angles = angles.to(device)
 
             # compute loss and update
             normals = model(images)
-            loss = loss_fun(normals, corrs)
+            loss = surface_normal_loss(normals, corrs, angles)
 
             # update weights
             optimizer.zero_grad()
@@ -111,39 +119,6 @@ def main(args):
             if((total_step) % args.image_step == 0):
                 writer.add_images('images/normals', (normals + 1 / 2), total_step)
             total_step += 1
-
-        ####################
-        # run validation
-        # we validate somehow using correspondence
-        sample_indices = list(range(len(val_dataset)))
-        sample_it = tqdm(sample_indices)
-        sample_it.set_description('Iterating samples')
-        model.eval()
-
-        validation_score = None
-        for data_index in sample_it:
-            data = val_dataset[data_index]
-            images, corrs = data
-            images = images.to(device)
-            corrs = corrs.to(device)
-
-            normals = model(images)
-
-            # implement local validation scoring
-            precision = None
-            raise NotImplementedError
-
-
-            description = 'precision: {}'.format(precision)
-            sample_it.set_description(description)
-
-            # implement global validation scoring
-            validation_score = None
-            raise NotImplementedError
-
-        # update scheduler based on validation score
-        scheduler.step(validation_f_score)
-
         # save every epoch
         checkpoint_name = '{}-{}.ckpt'.format(args.run_name, epoch)
         checkpoint_path = path.join(args.checkpoint_dir, checkpoint_name)
@@ -155,6 +130,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--run-name', type=str, required=True, help='theme of this run')
+    parser.add_argument('--config-file', type=str, required=True, help='path to augmentation config file')
     parser.add_argument('--epochs', type=int, default=30, help='Number of Epochs to run')
     parser.add_argument('--dataset-type', type=int, required=True, help='type of dataset: 0=coco, ...')
     parser.add_argument('--dataset-dir', type=str, default='data', help='Path of Dataset. Defaults to ./data')

@@ -1,5 +1,5 @@
-image-width: 320
-image-height: 240
+image-width: 256
+image-height: 256
 num-augmentations: 1
 color-perturb:
     probability: 0.5

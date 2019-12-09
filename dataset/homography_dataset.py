@@ -56,13 +56,13 @@ class HomographyDataset(BaseDataset):
         augmenteds = self.augment_images(cv_image, N)
 
         # obtain random homographies
-        homographies = self.random_sample_homographies(N, shape=(W, H))
+        homographies, angles = self.random_sample_homographies(N, shape=(W, H))
 
         # warp images
         warped = self.warp_images(augmenteds, homographies)
 
         # prepend original image and identity homography
-        return warped, homographies
+        return warped, homographies, angles
 
     def warp_images(self,
                     cv_images: np.ndarray,
@@ -89,6 +89,14 @@ class HomographyDataset(BaseDataset):
                                 flags=flag)
             for i, cv_image in enumerate(cv_images)
         ])
+
+    def rotmat_from_angles(self, angles):
+        return np.stack([
+            np.cos(-angles), np.sin(-angles), np.zeros_like(angles),
+            -np.sin(-angles), np.cos(-angles),np.zeros_like(angles),
+            np.zeros_like(angles),np.zeros_like(angles),np.ones_like(angles),
+        ], 2).reshape(-1, 3, 3)
+
 
     def compute_dense_correspondence(self, 
                                      images: np.ndarray, 
@@ -200,32 +208,6 @@ class HomographyDataset(BaseDataset):
             [patch_ratio, 0]
         ], dtype=np.float32).reshape((1, 4, 2)).repeat(N, 0) + margin
 
-        # Random perspective and affine perturbations
-        if perspective:
-            if not allow_artifacts:
-                perspective_amplitude_x = min(perspective_amplitude_x, margin)
-                perspective_amplitude_y = min(perspective_amplitude_y, margin)
-
-            l_sample = np.random.normal(0, perspective_amplitude_x / 2, N)
-            r_sample = np.random.normal(0, perspective_amplitude_x / 2, N)
-            y_sample = np.random.normal(0, perspective_amplitude_y / 2, N)
-
-            # all shapes are (N,)
-            perspective_displacements = np.clip(y_sample, -perspective_amplitude_y, perspective_amplitude_y)
-            h_displacement_lefts = np.clip(l_sample, -perspective_amplitude_x, perspective_amplitude_x)
-            h_displacement_rights = np.clip(r_sample, -perspective_amplitude_x, perspective_amplitude_x)
-
-            # add offsets
-            src_corners[:, 0, 0] += h_displacement_lefts
-            src_corners[:, 1, 0] -= h_displacement_lefts
-            src_corners[:, 2, 0] += h_displacement_rights
-            src_corners[:, 3, 0] -= h_displacement_rights
-
-            src_corners[:, 0, 1] += perspective_displacements
-            src_corners[:, 1, 1] -= perspective_displacements
-            src_corners[:, 2, 1] += perspective_displacements
-            src_corners[:, 3, 1] -= perspective_displacements
-
         # Random scaling
         # sample several scales, check collision with borders, randomly pick a valid one
         if scaling:
@@ -315,6 +297,8 @@ class HomographyDataset(BaseDataset):
                     idxs.append(idx)
                 src_corners = rotateds[range(N), idxs]
 
+            angles = -angles[:, idxs]
+
         # Rescale to actual size
         # shape = (H, W)
         t_shape = np.array(list(shape)).reshape(1, 1, 2)
@@ -324,11 +308,11 @@ class HomographyDataset(BaseDataset):
         #
         homographies = [ np.eye(3, dtype=np.float32) ]
         for i, ref_corner in enumerate(ref_corners):
-            homography = cv2.findHomography(src_corners[i], ref_corners, 0)[0]
+            homography = cv2.findHomography(ref_corners, src_corners[i], 0)[0]
             homographies.append(homography)
 
 
-        return np.stack(homographies).astype(np.float32)
+        return np.stack(homographies).astype(np.float32), angles
 
     def _resize_homography(self, homography, original_size, target_size):
         # build intrinsic matrix

@@ -44,7 +44,12 @@ class COCODataset(HomographyDataset):
         cv_image = np.array(sample)
         if(len(cv_image.shape) != 3):
             cv_image = np.tile(np.expand_dims(cv_image, 2), (1, 1, 3))
-        augmented, homographies = self.sample_images(cv_image)
+        augmented, homographies, angles = self.sample_images(cv_image)
         dense_corrs = self.compute_dense_correspondence(augmented, homographies)
 
-        return augmented, dense_corrs
+        torch_augmented = torch.from_numpy(augmented).permute(0, 3, 1, 2).float() / 255
+        torch_corrs = torch.from_numpy(dense_corrs)
+        torch_rotmat = torch.from_numpy(self.rotmat_from_angles(angles)).float()
+
+        return torch_augmented, torch_corrs, torch_rotmat
+
