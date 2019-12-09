@@ -28,9 +28,11 @@ import yaml
 
 # local imports
 from dataset import COCODataset
+from dataset import ImageNetDataset
+from torch.utils.data import Dataset, DataLoader
 from models.resnet50 import ED
 from utils.checkpoint import CheckPoint
-from utils.loss import surface_normal_loss
+from utils.loss import batch_surface_normal_loss
 
 
 logging.basicConfig(level='INFO',
@@ -62,12 +64,9 @@ def main(args):
 
     # setup colmap runner
     dataset_dir = args.dataset_dir
-    if(args.dataset_type == 0):
-        coco_dataset_dir = path.join(dataset_dir, 'coco')
-        train_dataset = COCODataset(coco_dataset_dir, config, mode='train')
-        val_dataset = COCODataset(coco_dataset_dir, config, mode='validation')
-    else:
-        raise NotImplementedError
+    imagenet_dataset_dir = path.join(dataset_dir, 'imagenet100')
+    train_dataset = ImageNetDataset(imagenet_dataset_dir, config, mode='train')
+    val_dataset = ImageNetDataset(imagenet_dataset_dir, config, mode='val')
 
     epoch_start = 0
     epoch_end = args.epochs
@@ -95,29 +94,42 @@ def main(args):
         ####################
         # run training
         model.train()
-        sample_indices = list(range(len(train_dataset)))
-        random.shuffle(sample_indices)
-        sample_it = tqdm(sample_indices, leave=False)
-        for data_index in sample_it:
-            data = train_dataset[data_index]
-            images, corrs, angles = data
+        num_samples = len(train_dataset)
+        dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
+        sample_it = tqdm(enumerate(dataloader), total=num_samples // args.batch_size)
+        for i_batch, data in sample_it:
+            # image
+            images, corrs, rotmat = data
             images = images.to(device)
             corrs = corrs.to(device)
-            angles = angles.to(device)
+            rotmat = rotmat.to(device)
+            B, _, _, H, W = images.shape
+
+            cat_images = images.view(-1, 3, H, W)
 
             # compute loss and update
-            normals = model(images)
-            loss = surface_normal_loss(normals, corrs, angles)
+            # normals = N x 2 x 3 x H x W
+            normals = model(cat_images).view(B, 2, 2, H, W)
+            x = normals[:, :, 0]
+            y = normals[:, :, 1]
+            # z = normals[:, :, 2]
+
+            loss = batch_surface_normal_loss(normals, corrs, rotmat)
 
             # update weights
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
+            xm = x.mean()
+            ym = y.mean()
             writer.add_scalar('data/loss', loss, total_step)
-            sample_it.set_description('loss: {:.02f}'.format(loss))
-            if((total_step) % args.image_step == 0):
-                writer.add_images('images/normals', (normals + 1 / 2), total_step)
+            sample_it.set_description('loss: {:.04f}, xm: {:.03f}, ym: {:.03f}'.format(loss, xm, ym))
+            if ((total_step % args.image_step ) == 0):
+                writer.add_images('images/images', images.view(-1, 3, H, W), total_step)
+                ni = torch.ones(B * 2, 3, H, W)
+                ni[:, :2] = normals.view(-1, 2, H, W)
+                writer.add_images('images/normals', (ni + 1 / 2), total_step)
             total_step += 1
         # save every epoch
         checkpoint_name = '{}-{}.ckpt'.format(args.run_name, epoch)
@@ -129,10 +141,11 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--batch-size', type=int, required=True, help='size of batch')
+    parser.add_argument('--num-workers', type=int, required=True, help='workers for dataloder')
     parser.add_argument('--run-name', type=str, required=True, help='theme of this run')
     parser.add_argument('--config-file', type=str, required=True, help='path to augmentation config file')
     parser.add_argument('--epochs', type=int, default=30, help='Number of Epochs to run')
-    parser.add_argument('--dataset-type', type=int, required=True, help='type of dataset: 0=coco, ...')
     parser.add_argument('--dataset-dir', type=str, default='data', help='Path of Dataset. Defaults to ./data')
     parser.add_argument('--gpu', type=int, default=None, help='GPU ID used for this run. Default=CPU')
     parser.add_argument('--checkpoint-dir', type=str, default='./checkpoints/', help='Path of checkpoint. Defaults to ./checkpoints')

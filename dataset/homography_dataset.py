@@ -92,10 +92,15 @@ class HomographyDataset(BaseDataset):
 
     def rotmat_from_angles(self, angles):
         return np.stack([
-            np.cos(-angles), np.sin(-angles), np.zeros_like(angles),
-            -np.sin(-angles), np.cos(-angles),np.zeros_like(angles),
-            np.zeros_like(angles),np.zeros_like(angles),np.ones_like(angles),
-        ], 2).reshape(-1, 3, 3)
+            np.cos(-angles), np.sin(-angles),
+            -np.sin(-angles), np.cos(-angles),
+        ], 2).reshape(-1, 2, 2)
+
+        # return np.stack([
+        #     np.cos(-angles), np.sin(-angles), np.zeros_like(angles),
+        #     -np.sin(-angles), np.cos(-angles),np.zeros_like(angles),
+        #     np.zeros_like(angles),np.zeros_like(angles),np.ones_like(angles),
+        # ], 2).reshape(-1, 3, 3)
 
 
     def compute_dense_correspondence(self, 

@@ -1,2 +1,3 @@
 from .coco_dataset import COCODataset
-__all__ = [COCODataset]
+from .imagenet_dataset import ImageNetDataset
+__all__ = [COCODataset, ImageNetDataset]
