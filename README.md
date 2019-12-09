@@ -77,6 +77,8 @@ The comparison of `InsDIS`, `MoCo`, `CMC (using YCbCr)`, and `UnNorm (ours)` and
 |  MoCo   | ResNet50 | 24 | Softmax-CE  | 16384  |  73.4  |
 |  CMC    | 2xResNet50half | 12 | NCE  | 4096  |  74.5  |
 |  CMC    | 2xResNet50half | 12 | Softmax-CE  | 4096  |  75.8  |
+|  InsDis+HomoAug | ResNet50 | 24 | Softmax-CE  | 16384  |  |
+|  MoCo+HomoAug   | ResNet50 | 24 | Softmax-CE  | 16384  |  |
 |  UnNorm | ResNet50 | 24 | - | -  | TODO |
 |  UnNorm | 2xResNet50half | 12 | - | - | TODO |
 
